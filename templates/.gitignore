@@ -1,8 +1,0 @@
-__pycache__/
-venv/
-.env
-*.pyc
-data/*.jpg
-data/*.png
-data/*.png
-static/result.jpg
