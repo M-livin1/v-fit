@@ -1,1 +1,7 @@
-
+__pycache__/
+venv/
+.env
+*.pyc
+data/*
+results/*
+static/result.jpg
