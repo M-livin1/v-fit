@@ -15,7 +15,7 @@
             background: white;
             padding: 30px;
             border-radius: 12px;
-            max-width: 520px;
+            width: 420px;
             margin: auto;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
@@ -42,13 +42,11 @@
 <div class="box">
     <h2>👕 Virtual Try-On Result</h2>
 
-    {% if has_no_shirt %}
     <p><strong>1. Shirt removed</strong></p>
     <img src="{{ url_for('no_shirt_image') }}?t={{ ts }}" alt="User without shirt">
-    {% endif %}
 
-    <p><strong>{% if has_no_shirt %}2. {% endif %}Final try-on</strong></p>
-    <img src="{{ url_for('final_image') }}?t={{ ts }}" alt="Final overlay">
+    <p><strong>2. With new shirt</strong></p>
+    <img src="{{ url_for('final_image') }}?t={{ ts }}" alt="Final try-on">
 
     <br>
     <a href="/">← Try Again</a>

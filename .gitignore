@@ -1,3 +1,4 @@
+# Private local use — no GitHub/remote
 __pycache__/
 venv/
 .env

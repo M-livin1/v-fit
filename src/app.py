@@ -15,7 +15,7 @@ PREPROCESS_SCRIPT = os.path.join(PROJECT_ROOT, "src", "api", "preprocessing.py")
 OVERLAY_SCRIPT = os.path.join(PROJECT_ROOT, "src", "api", "overlay.py")
 
 FINAL_IMAGE = os.path.join(RESULTS_DIR, "final_overlay.jpg")
-NO_SHIRT_IMAGE = os.path.join(RESULTS_DIR, "user_no_shirt.jpg")
+USER_NO_SHIRT = os.path.join(RESULTS_DIR, "user_no_shirt.jpg")
 
 app = Flask(
     __name__,
@@ -64,11 +64,8 @@ def result():
     import time
     if not os.path.exists(FINAL_IMAGE):
         return " No result image found."
-    return render_template(
-        "result.html",
-        ts=int(time.time()),
-        has_no_shirt=os.path.exists(NO_SHIRT_IMAGE),
-    )
+
+    return render_template("result.html", ts=int(time.time()))
 
 @app.route("/final")
 def final_image():
@@ -79,8 +76,8 @@ def final_image():
 
 @app.route("/no_shirt")
 def no_shirt_image():
-    if os.path.exists(NO_SHIRT_IMAGE):
-        return send_file(NO_SHIRT_IMAGE, mimetype="image/jpeg")
+    if os.path.exists(USER_NO_SHIRT):
+        return send_file(USER_NO_SHIRT, mimetype="image/jpeg")
     return " Image not found."
 
 
