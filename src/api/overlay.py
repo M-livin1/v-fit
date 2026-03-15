@@ -110,6 +110,11 @@ user_cleaned = user.astype(np.float32)
 user_cleaned = user_cleaned * (1.0 - erasure_alpha)
 user_cleaned = np.clip(user_cleaned, 0, 255).astype(np.uint8)
 
+# Save debug output: user without original shirt
+USER_NO_SHIRT = os.path.join(BASE_DIR, "results", "user_no_shirt.jpg")
+cv2.imwrite(USER_NO_SHIRT, user_cleaned)
+print(f"User without original shirt saved to {USER_NO_SHIRT}")
+
 """
 STEP 5: Composite & blend the WARPED INPUT SHIRT on top of the cleaned user.
 Only the uploaded shirt (cloth_clean.png) is visible in the torso area.
