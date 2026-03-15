@@ -1,94 +1,112 @@
 import cv2
-import mediapipe as mp
 import json
 import os
+import mediapipe as mp
+import numpy as np
+
+print(" Pose detection started")
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+
+INPUT_IMAGE = os.path.join(BASE_DIR, "data", "user.jpg")
+OUTPUT_IMAGE = os.path.join(BASE_DIR, "results", "user_pose.jpg")
+OUTPUT_JSON = os.path.join(BASE_DIR, "results", "user_pose_keypoints.json")
+
+os.makedirs(os.path.join(BASE_DIR, "results"), exist_ok=True)
+
+print(" Input image:", INPUT_IMAGE)
+
+img = cv2.imread(INPUT_IMAGE)
+if img is None:
+    raise FileNotFoundError(" User image not found")
+
+h, w, _ = img.shape
+img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
 
 mp_pose = mp.solutions.pose
-mp_drawing = mp.solutions.drawing_utils
+mp_draw = mp.solutions.drawing_utils
 
-def get_keypoints(image_path):
-    """
-    Returns dict with pixel coords for left_shoulder, right_shoulder, neck (approx via nose).
-    Returns None if no pose detected.
-    """
-    img = cv2.imread(image_path)
-    if img is None:
-        raise FileNotFoundError(f"Cannot load image: {image_path}")
-    h, w = img.shape[:2]
-    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+pose = mp_pose.Pose(
+    static_image_mode=True,
+    model_complexity=1,
+    enable_segmentation=True,
+    min_detection_confidence=0.5
+)
 
-    with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
-        res = pose.process(rgb)
+results = pose.process(img_rgb)
 
-    if not res.pose_landmarks:
-        return None
+if not results.pose_landmarks:
+    raise RuntimeError(" No human pose detected")
 
-    lm = res.pose_landmarks.landmark
-    def to_px(idx):
-        return int(lm[idx].x * w), int(lm[idx].y * h)
+# Save the segmentation mask if available
+if results.segmentation_mask is not None:
+    mask = (results.segmentation_mask > 0.5).astype(np.uint8) * 255
+    # Resize mask to original image dimensions
+    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+    mask_path = os.path.join(BASE_DIR, "results", "user_mask.png")
+    cv2.imwrite(mask_path, mask)
+    print(" Body mask saved:", mask_path)
 
-    left_shoulder = to_px(mp_pose.PoseLandmark.LEFT_SHOULDER.value)
-    right_shoulder = to_px(mp_pose.PoseLandmark.RIGHT_SHOULDER.value)
-    neck = to_px(mp_pose.PoseLandmark.NOSE.value)
+landmarks = results.pose_landmarks.landmark
 
+def get_point(name):
+    lm = landmarks[getattr(mp_pose.PoseLandmark, name).value]
     return {
-        "left_shoulder": left_shoulder,
-        "right_shoulder": right_shoulder,
-        "neck": neck
+        "x": int(lm.x * w),
+        "y": int(lm.y * h)
     }
 
-def draw_landmarks_and_save(image_path, out_image_path):
-    """
-    Debug helper: draws pose landmarks, highlights shoulders & neck,
-    saves annotated image and a keypoints JSON file.
-    """
-    img = cv2.imread(image_path)
-    if img is None:
-        print(f"Image not found: {image_path}")
-        return None
-    h, w = img.shape[:2]
-    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
-        res = pose.process(rgb)
+keypoints = {
+    "nose": get_point("NOSE"),
 
-    if not res.pose_landmarks:
-        print("No pose detected.")
-        return None
+    "left_shoulder": get_point("LEFT_SHOULDER"),
+    "right_shoulder": get_point("RIGHT_SHOULDER"),
 
-    annotated = img.copy()
-    mp_drawing.draw_landmarks(annotated, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+    "left_elbow": get_point("LEFT_ELBOW"),
+    "right_elbow": get_point("RIGHT_ELBOW"),
 
-    lm = res.pose_landmarks.landmark
-    def to_px(idx):
-        return int(lm[idx].x * w), int(lm[idx].y * h)
+    "left_hip": get_point("LEFT_HIP"),
+    "right_hip": get_point("RIGHT_HIP")
+}
 
-    ls = to_px(mp_pose.PoseLandmark.LEFT_SHOULDER.value)
-    rs = to_px(mp_pose.PoseLandmark.RIGHT_SHOULDER.value)
-    neck = to_px(mp_pose.PoseLandmark.NOSE.value)
+keypoints["neck"] = {
+    "x": int((keypoints["left_shoulder"]["x"] + keypoints["right_shoulder"]["x"]) / 2),
+    "y": int((keypoints["left_shoulder"]["y"] + keypoints["right_shoulder"]["y"]) / 2)
+}
 
-    cv2.circle(annotated, ls, 8, (0,255,0), -1)
-    cv2.circle(annotated, rs, 8, (0,0,255), -1)
-    cv2.circle(annotated, neck, 6, (255,0,0), -1)
 
-    os.makedirs(os.path.dirname(out_image_path) or '.', exist_ok=True)
-    cv2.imwrite(out_image_path, annotated)
+keypoints["torso_center"] = {
+    "x": int((keypoints["left_hip"]["x"] + keypoints["right_hip"]["x"]) / 2),
+    "y": int((keypoints["left_hip"]["y"] + keypoints["right_hip"]["y"]) / 2)
+}
 
-    keypoints = {
-        "left_shoulder": ls,
-        "right_shoulder": rs,
-        "neck": neck
-    }
-    json_path = os.path.splitext(out_image_path)[0] + "_keypoints.json"
-    with open(json_path, "w") as f:
-        json.dump(keypoints, f)
+with open(OUTPUT_JSON, "w") as f:
+    json.dump(keypoints, f, indent=2)
 
-    print("Saved:", out_image_path)
-    print("Saved:", json_path)
-    return keypoints
+print(" Keypoints saved:", OUTPUT_JSON)
 
-if __name__ == "__main__":
-    # debug-run (used when running the file locally)
-    inp = "data/user.jpg"
-    out = "results/user_pose.jpg"
-    kp = draw_landmarks_and_save(inp, out)
-    print("Keypoints:", kp)
+debug_img = img.copy()
+
+for name, pt in keypoints.items():
+    cv2.circle(debug_img, (pt["x"], pt["y"]), 6, (0, 0, 255), -1)
+    cv2.putText(
+        debug_img,
+        name,
+        (pt["x"] + 5, pt["y"] - 5),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.4,
+        (0, 255, 0),
+        1
+    )
+
+mp_draw.draw_landmarks(
+    debug_img,
+    results.pose_landmarks,
+    mp_pose.POSE_CONNECTIONS
+)
+
+cv2.imwrite(OUTPUT_IMAGE, debug_img)
+
+print(" Annotated image saved:", OUTPUT_IMAGE)
+print(" Pose detection finished successfully")
